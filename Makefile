@@ -1,9 +1,6 @@
-all: tracket tracket-cmp
+all: quantum
 
-tracket: main.rkt
-	raco exe --vv -o tracket main.rkt
+SRCS := main.rkt $(wildcard quantum/*.rkt)
 
-tracket-cmp: cmp.rkt
-	raco exe --vv -o tracket-cmp cmp.rkt
-
-
+qtm: $(SRCS)
+	raco exe --vv -o qtm main.rkt

@@ -1,12 +1,21 @@
 #lang racket/base
 ;; ---------------------------------------------------------------------------------------------------
 
-(require json
+(require "params.rkt"
+         "posix.rkt"
+         json
+         plot
+         racket/format
+         racket/function
          racket/list
+         racket/match
          racket/port
-         racket/function)
+         racket/string)
 
-(provide measure)
+(provide track-subprocess
+         plot-to-file
+         json-to-file
+         run-cmd)
 
 ;; ---------------------------------------------------------------------------------------------------
 
@@ -16,16 +25,33 @@
 ;; and call it.
 ;(define (track-procedure thunk)
 
-(define (track-subprocess parent pid [every (/ (p/ms-interval) 1000.0)])
+(struct measurement (start end mem-ticks)
+  #:transparent)
+
+(define (track-subprocess parent
+                          pid
+                          #:memory-accounting? [mem? #true]
+                          #:progress? [progress? #true]
+                          #:interval [secs (/ (p/ms-interval) 1000.0)])
   (printf "Tracking process ~a~n" pid)
   (define start (current-inexact-milliseconds))
-  (let loop ([lst (list (cons 0 (read-current-memory-use pid)))])
+  (let loop ([lst (if mem?
+                      (list (cons 0 (read-current-memory-use pid)))
+                      '())])
+    (when (and mem? progress?)
+      (printf "~a: ~a~n"
+              (round (- (current-inexact-milliseconds) start))
+              (cdar lst)))
+
     (sync (handle-evt
            (thread-receive-evt)
            (lambda (_)
-             (thread-send parent (list lst start (current-inexact-milliseconds)))))
+             (thread-send parent
+                          (measurement start (current-inexact-milliseconds) lst))))
           (handle-evt
-           (alarm-evt (+ (current-inexact-milliseconds) (* every 1000)))
+           (if mem?
+               (alarm-evt (+ (current-inexact-milliseconds) (* secs 1000)))
+               never-evt)
            (lambda (_)
              (with-handlers ([exn:fail:filesystem:errno?
                               (lambda (e) (loop lst))])
@@ -34,12 +60,11 @@
                (when (p/output-to-stdout)
                  (printf "~a ~a~n"
                          now
-                         (~r (/ (* pagesize (string->number mem))
+                         (~r (/ (* pagesize mem)
                                 (* 1024 1024))
                              #:precision 2)))
-               (sleep every)
-               (loop (cons (cons (- now start) mem)
-                           lst))))))))
+               (sleep secs)
+               (loop (cons (cons (- now start) mem) lst))))))))
 
 (define (json-to-file path data)
   (define fdata
@@ -67,31 +92,59 @@
    #:y-label "Mem (Mb)"
    path))
 
+(define (run-cmd cmd)
 
-(define (measure1 exe . args)
-  (define-values (exit-code spent real gc)
-    (time-apply
-     (thunk
-      (define-values (p out in err)
-        (apply subprocess
-               #false
-               #false
-               'stdout
-               exe args))
-      (close-output-port in)
-      (thread (thunk (copy-port out (open-output-nowhere))))
-      (subprocess-wait p)
-      (subprocess-status p))
-     '()))
-    (unless (zero? (first exit-code))
-      (printf "returned with non-zero exit code~n"))
-  real)
+  (define exe (first cmd))
+  (define args (rest cmd))
 
+  (define exepath
+    (if (absolute-path? exe)
+        exe
+        (path->string (find-executable-path exe))))
 
-(define (measure exe . args)
-  (define measurements
-    (for/list ([i (in-list (range 100))])
-      (cons i (apply measure1 exe args))))
-  (write-json (for/list ([m (in-list measurements)])
-                (make-hash `((iteration . ,(car m))
-                             (millisecs . ,(cdr m)))))))
+  (printf "Running command line ~a ~a~n"
+          exepath (string-join args))
+  (printf "Page size for your system is ~a bytes~n" pagesize)
+
+  (define-values (sp out in err)
+    (apply subprocess
+           (current-output-port)
+           (current-input-port)
+           (current-error-port)
+           exepath args))
+
+  (define parent (current-thread))
+  (define monitor
+    (thread
+     (thunk (track-subprocess parent
+                              (subprocess-pid sp)
+                              #:memory-accounting? (eq? (p/measure-mode) 'mem)))))
+  (subprocess-wait sp)
+  (define exitcode (subprocess-status sp))
+
+  (thread-send monitor 'done)
+  (match-define (struct measurement (start end data)) (thread-receive))
+  (thread-wait monitor)
+
+  (unless (zero? exitcode)
+    (fprintf (current-error-port) "Process exited with non-zero output: ~a~n" exitcode))
+
+  (when (and (eq? (p/measure-mode) 'mem) data)
+    (printf "Process finished (in ~ams), gathered ~a records (once every ~ams)~n"
+            (round (- end start))
+            (length data)
+            (~r (/ (round (- end start)) (length data))
+                #:precision 2))
+
+    ;; Tranform size into Megabytes
+    (define rdata
+      (for/list ([p (in-list data)])
+        (cons (car p)
+              (exact->inexact (/ (* pagesize (cdr p))
+                                 (* 1024 1024))))))
+    (printf "Maximum virtual memory used: ~aMb~n" (~r (apply max (map cdr rdata))
+                                                      #:precision 2))
+    (when (p/write-plot)
+      (plot-to-file (p/write-plot) rdata))
+    (when (p/write-json)
+      (json-to-file (p/write-json) rdata))))
