@@ -23,3 +23,15 @@
       (second
        (regexp-match #px"^[0-9]+ ([0-9]+) [0-9]+ [0-9]+ [0-9]+ [0-9]+ [0-9]+$"
                      (read-line)))))))
+
+
+
+;; ---------------------------------------------------------------------------------------------------
+
+;
+; Access to sched_ functions
+;
+
+
+(define sched_getaffinity (get-ffi-obj "sched_getaffinity" #false (_fun _pid _size_t _cpu_set_t -> _int)))
+                               
