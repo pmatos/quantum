@@ -1,5 +1,5 @@
-# LL-Tracket
-Low-level Application Performance and Memory Tracket
+# Quantum
+Low-level Application Performance and Memory Tracker
 
 ## Introduction
 
@@ -12,7 +12,7 @@ As a usage example, lets say we want to compare the memory usage by racket initi
 
 We can run each of them separately using
 ```
-$ ./tracket -j racket74cs.json -i 1 /home/pmatos/installs/racket-7.4_cs/bin/racket -e '(exit)'
+$ ./quantum measure -j racket74cs.json -i 1 /home/pmatos/installs/racket-7.4_cs/bin/racket -e '(exit)'
 Running command line /home/pmatos/installs/racket-7.4_cs/bin/racket -e (exit)
 Page size for your system is 4096 bytes
 Tracking process 25897
@@ -22,7 +22,7 @@ Maximum virtual memory used: 437.35Mb
 
 Run once for each version, gather the json and then do:
 ```
-$ ./tracket-cmp --output racket-exit.png Racket6.12:racket612.json Racket7.1:racket71.json Racket7.3:racket73.json RacketCS7.4:racket74cs.json
+$ ./quantum compare --output racket-exit.png Racket6.12:racket612.json Racket7.1:racket71.json Racket7.3:racket73.json RacketCS7.4:racket74cs.json
 Comparing:
 Racket6.12: racket612.json
 Racket7.1: racket71.json

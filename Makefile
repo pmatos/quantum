@@ -1,6 +1,12 @@
-all: quantum
+all: quantum 
 
-SRCS := main.rkt $(wildcard quantum/*.rkt)
+SRCS := main.rkt $(wildcard quantum-lib/*.rkt)
 
-qtm: $(SRCS)
-	raco exe --vv -o qtm main.rkt
+quantum: $(SRCS)
+	raco exe --vv -o quantum main.rkt
+
+.PHONY: clean
+
+clean:
+	-rm -r compiled
+	-rm quantum

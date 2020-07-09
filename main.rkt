@@ -1,9 +1,8 @@
 #lang racket/base
 ;; ---------------------------------------------------------------------------------------------------
 
-(require "quantum/quantum.rkt"
-         "quantum/posix.rkt"
-         "quantum/params.rkt")
+(require "quantum-lib/quantum.rkt"
+         "quantum-lib/params.rkt")
 
 ;; ---------------------------------------------------------------------------------------------------
 

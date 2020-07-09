@@ -5,8 +5,8 @@
 
 (provide
  (contract-out
-  [p/write-json (parameter/c boolean?)]
-  [p/write-plot (parameter/c boolean?)]
+  [p/write-json (parameter/c (or/c #false path-string?))]
+  [p/write-plot (parameter/c (or/c #false path-string?))]
   [p/output-to-stdout (parameter/c boolean?)]
   [p/ms-interval (parameter/c exact-positive-integer?)]
   [p/measure-mode (parameter/c (or/c #false 'mem 'time))]))

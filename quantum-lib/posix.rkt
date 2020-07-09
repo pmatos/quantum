@@ -56,3 +56,5 @@
 
 (define (sched-setaffinity pid mask)
   (_sched_setaffinity pid (ctype-sizeof _cpu_set_t) mask))
+
+;; ---------------------------------------------------------------------------------------------------
